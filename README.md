@@ -57,6 +57,22 @@ A lightweight, production-quality monitoring system for cloud services — real-
 
 ---
 
+### Prerequisites
+
+You need the following tools installed before running anything:
+
+| Tool | Minimum version | Verify |
+|---|---|---|
+| Git | any | `git --version` |
+| Python | 3.11 | `python3 --version` _(macOS/Linux)_ · `python --version` _(Windows)_ |
+| Node.js | 18 | `node --version` |
+| npm | 9 | `npm --version` |
+| Docker Desktop | latest | `docker --version` |
+
+> PostgreSQL does **not** need to be installed locally — Docker provides it.
+
+---
+
 ## 🚀 Quick Start
 
 ### 1. Configure environment
@@ -112,6 +128,154 @@ curl -X POST http://localhost:8000/alerts/rules \
     "consecutive_required": 3
   }'
 ```
+
+---
+
+
+### Run backend locally (without Docker)
+
+**Step 1 — Create and activate a virtual environment**
+
+A virtual environment isolates the project's Python packages from your system Python, preventing version conflicts between projects.
+
+```bash
+# macOS / Linux
+cd backend
+python3 -m venv .venv
+
+# Windows (PowerShell or CMD)
+cd backend
+python -m venv .venv
+```
+
+**Step 2 — Activate the virtual environment**
+
+```bash
+# macOS / Linux
+source .venv/bin/activate
+
+# Windows (Command Prompt)
+.venv\Scripts\activate.bat
+
+# Windows (PowerShell)
+.venv\Scripts\Activate.ps1
+```
+
+You'll see `(.venv)` appear at the start of your terminal prompt — this confirms the environment is active. All `pip install` and `python` commands now run inside it.
+
+**Step 3 — Install dependencies**
+
+```bash
+pip install -r requirements.txt
+```
+
+**Step 4 — Set environment variables**
+
+The backend reads config from environment variables. You can either export them manually or point to a `.env` file:
+
+```bash
+# macOS / Linux — Option A: export individually
+export DATABASE_URL=postgresql://monitor:monitor@localhost:5432/monitoring
+export SMTP_USER=
+export SMTP_PASSWORD=
+
+# macOS / Linux — Option B: load from .env file
+export $(grep -v '^#' ../.env | xargs)
+
+# Windows (PowerShell) — Option A: set individually
+$env:DATABASE_URL="postgresql://monitor:monitor@localhost:5432/monitoring"
+$env:SMTP_USER=""
+$env:SMTP_PASSWORD=""
+
+# Windows (CMD) — Option A: set individually
+set DATABASE_URL=postgresql://monitor:monitor@localhost:5432/monitoring
+set SMTP_USER=
+set SMTP_PASSWORD=
+```
+
+> You still need a running PostgreSQL instance. The easiest way is to spin up just the database container:
+> ```bash
+> docker-compose up db -d
+> ```
+
+**Step 5 — Run the backend**
+
+```bash
+uvicorn app.main:app --reload --port 8000
+```
+
+`--reload` means the server automatically restarts whenever you save a Python file — essential for development.
+
+The API is now live at http://localhost:8000 and Swagger docs at http://localhost:8000/docs.
+
+**Step 6 — Deactivate when done**
+
+```bash
+deactivate
+```
+
+---
+
+### Run frontend locally
+
+**Step 1 — Install dependencies**
+
+```bash
+cd frontend
+npm install
+```
+
+**Step 2 — Start the dev server**
+
+```bash
+npm run dev
+```
+
+Vite starts at http://localhost:5173 and automatically proxies `/api/` calls to the backend at `localhost:8000`, so both can run side by side without CORS issues.
+
+The browser auto-refreshes whenever you save a file (hot module replacement).
+
+**Step 3 — Build for production (optional)**
+
+```bash
+npm run build
+# Output is in frontend/dist/
+```
+
+---
+
+### Run simulator locally
+
+The simulator has **no external dependencies** — it uses only Python's standard library, so no virtual environment is needed.
+
+```bash
+# macOS / Linux
+python3 simulator/simulator.py
+
+# Windows
+python simulator/simulator.py
+
+# With all options (macOS / Linux)
+python3 simulator/simulator.py \
+  --url http://localhost:8000/metrics \
+  --interval 1 \
+  --services 2 \
+  --verbose
+
+# With all options (Windows)
+python simulator/simulator.py `
+  --url http://localhost:8000/metrics `
+  --interval 1 `
+  --services 2 `
+  --verbose
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--url` | `http://localhost:8000/metrics` | Backend endpoint |
+| `--interval` | `2.0` | Seconds between metric batches |
+| `--services` | `4` | Number of services to simulate (max 4) |
+| `--verbose` | off | Print every metric as it is sent |
 
 ---
 
@@ -443,34 +607,3 @@ The blast radius of a database swap is contained entirely to the data access lay
 - **Multi-tenancy** — per-organisation isolation
 - **Metric aggregation** — pre-computed 1m/5m/1h rollups
 - **Authentication** — JWT or API key middleware
-
----
-
-## 🛠 Development
-
-### Run backend locally (without Docker)
-
-```bash
-cd backend
-pip install -r requirements.txt
-# Set DATABASE_URL to a local Postgres instance
-uvicorn app.main:app --reload --port 8000
-```
-
-### Run frontend locally
-
-```bash
-cd frontend
-npm install
-npm run dev   # http://localhost:5173 (proxied to localhost:8000)
-```
-
-### Run simulator with custom settings
-
-```bash
-python simulator/simulator.py \
-  --url http://localhost:8000/metrics \
-  --interval 1 \
-  --services 2 \
-  --verbose
-```
