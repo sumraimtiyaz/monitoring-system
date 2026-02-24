@@ -90,44 +90,9 @@ docker-compose up --build
 | Dashboard | http://localhost:3000 |
 | API docs (Swagger) | http://localhost:8000/docs |
 | Backend health | http://localhost:8000/health |
+| Simulator Status | http://localhost:8000/metrics |
 
 First Time it will take some time
-
-### 3. Run the simulator
-
-```bash
-# In a separate terminal
-cd simulator
-python simulator.py
-# Optional flags:
-#   --url http://localhost:8000/metrics
-#   --interval 2          (seconds between batches)
-#   --services 2          (number of services, default: 4)
-#   --verbose             (print each metric)
-```
-
-Within seconds you'll see services appearing on the dashboard with live metric charts.
-
-### 4. Create alert rules
-
-Using the dashboard UI: open any service → "Alert Rules" → "New Rule"
-
-Using the API directly:
-```bash
-# Get service IDs
-curl http://localhost:8000/services
-
-# Create a rule
-curl -X POST http://localhost:8000/alerts/rules \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "service_id": "<id>",
-    "metric_name": "cpu",
-    "operator": ">",
-    "threshold": 80,
-    "consecutive_required": 3
-  }'
-```
 
 ---
 
