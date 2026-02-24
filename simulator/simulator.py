@@ -139,15 +139,20 @@ def post_metric(url: str, service: str, name: str, value: float, verbose: bool):
 
 # ── Main loop ─────────────────────────────────────────────────────────────────
 def main():
+    import os
     parser = argparse.ArgumentParser(description="Cloud Monitor — Metric Simulator")
-    parser.add_argument("--url", default="http://localhost:8000/metrics",
-                        help="Backend /metrics endpoint URL")
-    parser.add_argument("--interval", type=float, default=2.0,
-                        help="Seconds between metric batches")
-    parser.add_argument("--services", type=int, default=len(SERVICES),
-                        help="Number of services to simulate (max: %(default)s)")
+    parser.add_argument("--url",
+                        default=os.environ.get("METRICS_URL", "http://localhost:8000/metrics"),
+                        help="Backend /metrics endpoint URL (or set METRICS_URL env var)")
+    parser.add_argument("--interval", type=float,
+                        default=float(os.environ.get("INTERVAL", "2.0")),
+                        help="Seconds between metric batches (or set INTERVAL env var)")
+    parser.add_argument("--services", type=int,
+                        default=int(os.environ.get("SERVICES", str(len(SERVICES)))),
+                        help="Number of services to simulate (or set SERVICES env var)")
     parser.add_argument("--verbose", action="store_true",
-                        help="Print each metric as it's sent")
+                        default=os.environ.get("VERBOSE", "").lower() == "true",
+                        help="Print each metric as it's sent (or set VERBOSE=true env var)")
     args = parser.parse_args()
 
     services = SERVICES[:args.services]

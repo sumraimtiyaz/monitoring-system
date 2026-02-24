@@ -45,6 +45,17 @@ services:
       - backend
     ports:
       - "3000:80"
+      
+  simulator:
+    build: ./simulator
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      METRICS_URL: http://backend:8000/metrics
+      INTERVAL: "2.0"
+      SERVICES: "4"
+      VERBOSE: "false"
 
 volumes:
   pgdata:
