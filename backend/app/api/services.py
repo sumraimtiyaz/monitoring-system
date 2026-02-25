@@ -1,3 +1,6 @@
+"""
+Services API - endpoints for service-related operations.
+"""
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.core.database import get_db
@@ -10,9 +13,11 @@ router = APIRouter(prefix="/services", tags=["services"])
 
 
 def _build_service_health(service, metric_repo: MetricRepository, alert_repo: AlertRepository) -> ServiceHealth:
+    """Build a ServiceHealth object from a Service model."""
     active_alerts = alert_repo.get_active_alerts(service.id)
     latest_metrics = metric_repo.get_latest_per_metric(service.id)
 
+    # Determine status based on active alerts
     if len(active_alerts) > 0:
         status = "Critical"
     else:
@@ -30,6 +35,7 @@ def _build_service_health(service, metric_repo: MetricRepository, alert_repo: Al
 
 @router.get("", response_model=list[ServiceOut])
 def list_services(db: Session = Depends(get_db)):
+    """List all services."""
     return ServiceRepository(db).get_all()
 
 
@@ -43,7 +49,10 @@ def dashboard_overview(db: Session = Depends(get_db)):
     services = service_repo.get_all()
     total_active = alert_repo.get_all_active_alerts_count()
 
-    health_list = [_build_service_health(s, metric_repo, alert_repo) for s in services]
+    health_list = [
+        _build_service_health(s, metric_repo, alert_repo) 
+        for s in services
+    ]
 
     return DashboardOverview(
         total_services=len(services),
@@ -54,6 +63,7 @@ def dashboard_overview(db: Session = Depends(get_db)):
 
 @router.get("/{service_id}", response_model=ServiceHealth)
 def get_service_health(service_id: str, db: Session = Depends(get_db)):
+    """Get health information for a specific service."""
     service = ServiceRepository(db).get_by_id(service_id)
     if not service:
         raise HTTPException(status_code=404, detail="Service not found")

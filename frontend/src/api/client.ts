@@ -1,22 +1,71 @@
+/**
+ * API Client - Centralized HTTP client with error handling and type safety.
+ */
 const BASE = import.meta.env.VITE_API_URL || '/api'
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    ...options,
-  })
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`${res.status}: ${text}`)
+/**
+ * Custom error class for API errors with better error information.
+ */
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+    public details?: string
+  ) {
+    super(message)
+    this.name = 'ApiError'
   }
-  return res.json()
 }
 
-// ── Types ──────────────────────────────────────────────────────────────────
+/**
+ * Generic request function with error handling.
+ */
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const url = `${BASE}${path}`
+  
+  try {
+    const res = await fetch(url, {
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...options?.headers 
+      },
+      ...options,
+    })
+    
+    if (!res.ok) {
+      const text = await res.text()
+      throw new ApiError(
+        res.status,
+        `HTTP ${res.status}: ${res.statusText}`,
+        text
+      )
+    }
+    
+    // Handle 204 No Content
+    if (res.status === 204) {
+      return undefined as T
+    }
+    
+    return res.json()
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error
+    }
+    // Network error or other issues
+    throw new ApiError(0, 'Network error', error instanceof Error ? error.message : 'Unknown error')
+  }
+}
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+export type ServiceStatus = 'Healthy' | 'Degraded' | 'Critical'
+export type AlertStatus = 'FIRING' | 'RESOLVED'
+
 export interface ServiceHealth {
   id: string
   name: string
-  status: 'Healthy' | 'Degraded' | 'Critical'
+  status: ServiceStatus
   active_alerts: number
   latest_metrics: Record<string, number>
   created_at: string
@@ -37,7 +86,7 @@ export interface AlertOut {
   id: string
   rule_id: string
   service_id: string
-  status: 'FIRING' | 'RESOLVED'
+  status: AlertStatus
   message: string
   fired_at: string
   resolved_at?: string
@@ -55,35 +104,46 @@ export interface AlertRuleOut {
   created_at: string
 }
 
-// ── API calls ──────────────────────────────────────────────────────────────
+export interface AlertRuleCreate {
+  service_id: string
+  metric_name: string
+  operator: string
+  threshold: number
+  consecutive_required: number
+}
+
+// ── API Calls ──────────────────────────────────────────────────────────────
+
 export const api = {
+  // Dashboard
   getDashboard: () => request<DashboardOverview>('/services/dashboard'),
 
+  // Services
   getServiceHealth: (id: string) => request<ServiceHealth>(`/services/${id}`),
 
+  // Metrics
   getMetricSeries: (serviceId: string, metric: string, window: string) =>
     request<MetricPoint[]>(`/metrics/${serviceId}/${metric}?window=${window}`),
 
   getAvailableMetrics: (serviceId: string) =>
     request<string[]>(`/metrics/${serviceId}/available/names`),
 
+  // Alerts
   getActiveAlerts: (serviceId?: string) =>
     request<AlertOut[]>(`/alerts${serviceId ? `?service_id=${serviceId}` : ''}`),
 
-  getAlertHistory: (serviceId: string) =>
-    request<AlertOut[]>(`/alerts/${serviceId}/history`),
+  getAlertHistory: (serviceId: string, limit = 50) =>
+    request<AlertOut[]>(`/alerts/${serviceId}/history?limit=${limit}`),
 
   getAlertRules: (serviceId?: string) =>
     request<AlertRuleOut[]>(`/alerts/rules${serviceId ? `?service_id=${serviceId}` : ''}`),
 
-  createAlertRule: (payload: {
-    service_id: string
-    metric_name: string
-    operator: string
-    threshold: number
-    consecutive_required: number
-  }) => request<AlertRuleOut>('/alerts/rules', { method: 'POST', body: JSON.stringify(payload) }),
+  createAlertRule: (payload: AlertRuleCreate) =>
+    request<AlertRuleOut>('/alerts/rules', { 
+      method: 'POST', 
+      body: JSON.stringify(payload) 
+    }),
 
   deleteAlertRule: (ruleId: string) =>
-    fetch(`${BASE}/alerts/rules/${ruleId}`, { method: 'DELETE' }),
+    request<void>(`/alerts/rules/${ruleId}`, { method: 'DELETE' }),
 }
